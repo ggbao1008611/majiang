@@ -1,1 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网页联机麻将</title>
+    <style>
+        body { background-color: #006400; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        
+        /* 登录框 */
+        #login { margin-top: 100px; padding: 20px; background: rgba(0,0,0,0.5); border-radius: 10px; display: inline-block; }
+        input { padding: 10px; font-size: 16px; border-radius: 5px; border: none; }
+        button { padding: 10px 20px; font-size: 16px; background: #ffcc00; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;}
+        button:hover { background: #ffdb4d; }
 
+        /* 游戏区 */
+        #game { display: none; }
+        .table-center { background: #004d00; border: 5px solid #8b4513; padding: 20px; border-radius: 10px; margin-bottom: 20px; min-height: 100px;}
+        .info-text { font-size: 18px; color: #ddd; }
+        .status-bar { font-size: 24px; font-weight: bold; color: yellow; margin: 10px 0; }
+
+        /* 麻将牌样式 */
+        .hand-area { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; display: inline-block;}
+        .card {
+            display: inline-block; width: 40px; height: 56px; 
+            background: #fff; color: #cc0000; font-weight: bold; font-size: 20px;
+            border-radius: 4px; margin: 2px; line-height: 56px; cursor: pointer;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5); border: 1px solid #ccc;
+            position: relative; top: 0; transition: top 0.2s;
+        }
+        .card:hover { top: -10px; background: #f0f0f0; }
+
+        /* 日志 */
+        #logs { margin-top: 20px; height: 150px; overflow-y: auto; background: rgba(0,0,0,0.3); text-align: left; padding: 10px; font-size: 14px;}
+        p { margin: 5px 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="login">
+        <h2>🀄 极简网页麻将</h2>
+        <input type="text" id="roomInput" placeholder="输入房间号 (如 888)">
+        <button onclick="join()">进入房间</button>
+    </div>
+
+    <div id="game">
+        <div class="table-center">
+            <div class="info-text" id="roomInfo">等待玩家...</div>
+            <div class="status-bar" id="status">等待开始</div>
+        </div>
+
+        <div>
+            <h3>我的手牌</h3>
+            <div class="hand-area" id="myHand"></div>
+        </div>
+
+        <div id="logs"></div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+    let roomId = "";
+    let isMyTurn = false;
+
+    function join() {
+        roomId = document.getElementById('roomInput').value;
+        if(!roomId) return alert("请输入房间号");
+        socket.emit('joinRoom', roomId);
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('game').style.display = 'block';
+    }
+
+    socket.on('updateInfo', (msg) => {
+        document.getElementById('roomInfo').innerText = msg;
+    });
+
+    socket.on('msg', (msg) => {
+        const logs = document.getElementById('logs');
+        logs.innerHTML += `<p>${msg}</p>`;
+        logs.scrollTop = logs.scrollHeight;
+    });
+
+    socket.on('gameState', (state) => {
+        isMyTurn = state.isMyTurn;
+        document.getElementById('status').innerText = isMyTurn ? "🟢 轮到你出牌！" : "🔴 等待他人...";
+        
+        const handDiv = document.getElementById('myHand');
+        handDiv.innerHTML = '';
+        state.hand.forEach((card, idx) => {
+            const c = document.createElement('div');
+            c.className = 'card';
+            c.innerText = card;
+            c.onclick = () => {
+                if(!isMyTurn) return alert("还没轮到你！");
+                socket.emit('playCard', { roomId, card, index: idx });
+            };
+            handDiv.appendChild(c);
+        });
+    });
+</script>
+
+</body>
+</html>
