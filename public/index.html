@@ -9,42 +9,46 @@
         .container { max-width: 800px; margin: 0 auto; }
         
         /* 登录框 */
-        #login { margin-top: 100px; padding: 20px; background: rgba(0,0,0,0.5); border-radius: 10px; display: inline-block; }
-        input { padding: 10px; font-size: 16px; border-radius: 5px; border: none; }
-        button { padding: 10px 20px; font-size: 16px; background: #ffcc00; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;}
+        #login { margin-top: 80px; padding: 30px; background: rgba(0,0,0,0.6); border-radius: 10px; display: inline-block; }
+        input { padding: 12px; font-size: 16px; border-radius: 5px; border: none; margin: 5px; width: 200px; display: block; margin: 10px auto;}
+        button { padding: 10px 30px; font-size: 18px; background: #ffcc00; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 20px;}
         button:hover { background: #ffdb4d; }
 
         /* 游戏区 */
         #game { display: none; }
-        .table-center { background: #004d00; border: 5px solid #8b4513; padding: 20px; border-radius: 10px; margin-bottom: 20px; min-height: 100px;}
-        .info-text { font-size: 18px; color: #ddd; }
-        .status-bar { font-size: 24px; font-weight: bold; color: yellow; margin: 10px 0; }
+        .table-center { background: #004d00; border: 4px solid #8b4513; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        .info-text { font-size: 16px; color: #ccc; margin-bottom: 5px;}
+        .status-bar { font-size: 22px; font-weight: bold; color: yellow; margin: 10px 0; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 5px;}
 
-        /* 麻将牌样式 */
-        .hand-area { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; display: inline-block;}
+        /* 麻将牌 */
+        .hand-area { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; display: inline-block; min-height: 70px;}
         .card {
-            display: inline-block; width: 40px; height: 56px; 
+            display: inline-block; width: 42px; height: 60px; 
             background: #fff; color: #cc0000; font-weight: bold; font-size: 20px;
-            border-radius: 4px; margin: 2px; line-height: 56px; cursor: pointer;
+            border-radius: 4px; margin: 3px; line-height: 60px; cursor: pointer;
             box-shadow: 2px 2px 5px rgba(0,0,0,0.5); border: 1px solid #ccc;
-            position: relative; top: 0; transition: top 0.2s;
+            position: relative; top: 0; transition: top 0.2s; user-select: none;
         }
-        .card:hover { top: -10px; background: #f0f0f0; }
+        .card:hover { top: -10px; background: #f9f9f9; }
 
         /* 日志 */
-        #logs { margin-top: 20px; height: 150px; overflow-y: auto; background: rgba(0,0,0,0.3); text-align: left; padding: 10px; font-size: 14px;}
-        p { margin: 5px 0; }
+        #logs { margin-top: 20px; height: 200px; overflow-y: auto; background: rgba(0,0,0,0.4); text-align: left; padding: 15px; font-size: 14px; border-radius: 5px;}
+        p { margin: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;}
     </style>
 </head>
 <body>
 
 <div class="container">
+    <!-- 登录界面 -->
     <div id="login">
-        <h2>🀄 极简网页麻将</h2>
-        <input type="text" id="roomInput" placeholder="输入房间号 (如 888)">
-        <button onclick="join()">进入房间</button>
+        <h2>🀄 在线麻将</h2>
+        <!-- 新增：名字输入框 -->
+        <input type="text" id="nameInput" placeholder="请输入你的昵称 (例如: 雀神)">
+        <input type="text" id="roomInput" placeholder="请输入房间号 (例如: 888)">
+        <button onclick="join()">开始游戏</button>
     </div>
 
+    <!-- 游戏界面 -->
     <div id="game">
         <div class="table-center">
             <div class="info-text" id="roomInfo">等待玩家...</div>
@@ -67,9 +71,15 @@
     let isMyTurn = false;
 
     function join() {
-        roomId = document.getElementById('roomInput').value;
+        const name = document.getElementById('nameInput').value.trim();
+        roomId = document.getElementById('roomInput').value.trim();
+        
+        if(!name) return alert("起个名字吧！");
         if(!roomId) return alert("请输入房间号");
-        socket.emit('joinRoom', roomId);
+
+        // 发送名字和房间号给服务器
+        socket.emit('joinRoom', { roomId: roomId, playerName: name });
+        
         document.getElementById('login').style.display = 'none';
         document.getElementById('game').style.display = 'block';
     }
@@ -86,7 +96,16 @@
 
     socket.on('gameState', (state) => {
         isMyTurn = state.isMyTurn;
-        document.getElementById('status').innerText = isMyTurn ? "🟢 轮到你出牌！" : "🔴 等待他人...";
+        
+        // 显示当前是谁的回合
+        const statusDiv = document.getElementById('status');
+        if (isMyTurn) {
+            statusDiv.innerText = "🟢 轮到你了！请出牌";
+            statusDiv.style.color = "#00ff00";
+        } else {
+            statusDiv.innerText = `🔴 等待 【${state.turnName}】 出牌...`;
+            statusDiv.style.color = "yellow";
+        }
         
         const handDiv = document.getElementById('myHand');
         handDiv.innerHTML = '';
