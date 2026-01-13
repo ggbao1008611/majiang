@@ -32,6 +32,8 @@
         .pill { background: rgba(0,0,0,0.45); border-radius: 999px; padding: 6px 14px; font-size: 14px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15); }
         .controls { margin-top: 15px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
         .controls button { margin-top: 0; font-size: 16px; }
+        .controls .danger { background: linear-gradient(135deg, #ff8686, #e64a4a); color: #fff7f7; }
+        .controls .danger:hover { background: linear-gradient(135deg, #ff9c9c, #f05b5b); }
         .turn-hint { font-size: 14px; color: #d9d9d9; }
 
         /* 麻将牌 */
@@ -81,6 +83,7 @@
             <div class="turn-hint" id="turnHint">提示：四人入座后可开始。</div>
             <div class="controls">
                 <button onclick="requestStart()">开始新局</button>
+                <button class="danger" onclick="leaveGame()">退出房间</button>
             </div>
         </div>
 
@@ -161,6 +164,22 @@
     function requestStart() {
         if (!roomId) return alert("请先加入房间！");
         socket.emit('requestStart', { roomId });
+    }
+
+    function leaveGame() {
+        if (!roomId) return;
+        socket.emit('leaveRoom', { roomId, clientId });
+        localStorage.removeItem('mahjongRoomId');
+        localStorage.removeItem('mahjongPlayerName');
+        document.getElementById('game').style.display = 'none';
+        document.getElementById('login').style.display = 'block';
+        document.getElementById('roomInfo').innerText = '等待玩家...';
+        document.getElementById('myHand').innerHTML = '';
+        document.getElementById('discardArea').innerHTML = '';
+        document.getElementById('logs').innerHTML = '';
+        document.getElementById('deckInfo').innerText = '剩余牌：--';
+        document.getElementById('roundInfo').innerText = '局势：等待开始';
+        document.getElementById('turnHint').innerText = '提示：四人入座后可开始。';
     }
 
     socket.on('updateInfo', (msg) => {

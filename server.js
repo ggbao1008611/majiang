@@ -211,6 +211,23 @@ io.on('connection', (socket) => {
         startGame(roomId);
     });
 
+    socket.on('leaveRoom', ({ roomId, clientId }) => {
+        const room = rooms[roomId];
+        if (!room) return;
+        socket.leave(roomId);
+        const beforeCount = room.players.length;
+        room.players = room.players.filter(player => {
+            if (clientId) {
+                return player.clientId !== clientId;
+            }
+            return player.id !== socket.id;
+        });
+        if (room.players.length !== beforeCount) {
+            const playerNames = room.players.map(p => p.name).join(', ');
+            io.to(roomId).emit('updateInfo', `房间人数: ${room.players.length}/4 (玩家: ${playerNames})`);
+        }
+    });
+
     socket.on('disconnect', () => {
         Object.keys(rooms).forEach((roomId) => {
             const room = rooms[roomId];
