@@ -106,7 +106,7 @@ function checkHu(hand) {
 io.on('connection', (socket) => {
     // console.log('连接: ' + socket.id);
 
-    socket.on('joinRoom', ({ roomId, playerName }) => {
+    socket.on('joinRoom', ({ roomId, playerName, clientId }) => {
         socket.join(roomId);
         
         if (!rooms[roomId]) {
@@ -121,11 +121,16 @@ io.on('connection', (socket) => {
 
         const room = rooms[roomId];
         const existingPlayer = room.players.find(p => p.id === socket.id);
-        
-        if (!existingPlayer && room.players.length < 4) {
+        const existingClient = clientId ? room.players.find(p => p.clientId === clientId) : null;
+
+        if (existingClient) {
+            existingClient.id = socket.id;
+            existingClient.name = playerName || existingClient.name;
+        } else if (!existingPlayer && room.players.length < 4) {
             room.players.push({ 
                 id: socket.id, 
                 name: playerName || `玩家${socket.id.substr(0,4)}`,
+                clientId: clientId || socket.id,
                 hand: [] 
             });
         }
@@ -204,6 +209,18 @@ io.on('connection', (socket) => {
             return;
         }
         startGame(roomId);
+    });
+
+    socket.on('disconnect', () => {
+        Object.keys(rooms).forEach((roomId) => {
+            const room = rooms[roomId];
+            const beforeCount = room.players.length;
+            room.players = room.players.filter(player => player.id !== socket.id);
+            if (room.players.length !== beforeCount) {
+                const playerNames = room.players.map(p => p.name).join(', ');
+                io.to(roomId).emit('updateInfo', `房间人数: ${room.players.length}/4 (玩家: ${playerNames})`);
+            }
+        });
     });
 });
 

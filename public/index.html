@@ -114,6 +114,16 @@
     let roomId = "";
     let isMyTurn = false;
     let playerName = "";
+    let clientId = "";
+
+    function getClientId() {
+        let storedId = localStorage.getItem('mahjongClientId');
+        if (!storedId) {
+            storedId = `client-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            localStorage.setItem('mahjongClientId', storedId);
+        }
+        return storedId;
+    }
 
     function join() {
         const name = document.getElementById('nameInput').value.trim();
@@ -123,7 +133,8 @@
         if(!roomId) return alert("请输入房间号");
 
         // 发送名字和房间号给服务器
-        socket.emit('joinRoom', { roomId: roomId, playerName: name });
+        clientId = getClientId();
+        socket.emit('joinRoom', { roomId: roomId, playerName: name, clientId });
         playerName = name;
         localStorage.setItem('mahjongRoomId', roomId);
         localStorage.setItem('mahjongPlayerName', name);
@@ -141,7 +152,8 @@
         playerName = storedName;
         document.getElementById('nameInput').value = storedName;
         document.getElementById('roomInput').value = storedRoom;
-        socket.emit('joinRoom', { roomId: roomId, playerName: playerName });
+        clientId = getClientId();
+        socket.emit('joinRoom', { roomId: roomId, playerName: playerName, clientId });
         document.getElementById('login').style.display = 'none';
         document.getElementById('game').style.display = 'block';
     }
