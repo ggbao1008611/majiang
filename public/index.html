@@ -19,7 +19,6 @@
         #login { margin-top: 80px; padding: 32px 40px; background: rgba(0,0,0,0.55); border-radius: 16px; display: inline-block; box-shadow: 0 20px 40px rgba(0,0,0,0.35); backdrop-filter: blur(4px); }
         #login h2 { margin-top: 0; }
         .dept-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; background: rgba(255,255,255,0.15); font-size: 14px; margin: 10px 0 6px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2); }
-        .dept-note { font-size: 12px; color: #d7ead7; margin: 0 0 8px; }
         input { padding: 12px; font-size: 16px; border-radius: 8px; border: none; margin: 5px; width: 220px; display: block; margin: 12px auto; box-shadow: inset 0 1px 2px rgba(0,0,0,0.3); }
         button { padding: 10px 30px; font-size: 18px; background: linear-gradient(135deg, #ffd84d, #ffb300); border: none; border-radius: 999px; cursor: pointer; font-weight: bold; margin-top: 20px; color: #3b2a00; box-shadow: 0 10px 20px rgba(0,0,0,0.25); }
         button:hover { background: linear-gradient(135deg, #ffe57a, #ffc233); }
@@ -64,7 +63,6 @@
     <div id="login">
         <h2>🀄 在线麻将</h2>
         <div class="dept-badge">🩺 肾内科专属</div>
-        <p class="dept-note">进入游戏前展示专属标识，可按需调整文案。</p>
         <!-- 新增：名字输入框 -->
         <input type="text" id="nameInput" placeholder="请输入你的昵称 (例如: 雀神)">
         <input type="text" id="roomInput" placeholder="请输入房间号 (例如: 888)">
@@ -115,6 +113,7 @@
     const socket = io();
     let roomId = "";
     let isMyTurn = false;
+    let playerName = "";
 
     function join() {
         const name = document.getElementById('nameInput').value.trim();
@@ -125,7 +124,24 @@
 
         // 发送名字和房间号给服务器
         socket.emit('joinRoom', { roomId: roomId, playerName: name });
+        playerName = name;
+        localStorage.setItem('mahjongRoomId', roomId);
+        localStorage.setItem('mahjongPlayerName', name);
         
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('game').style.display = 'block';
+    }
+
+    function autoJoinFromStorage() {
+        const storedRoom = localStorage.getItem('mahjongRoomId');
+        const storedName = localStorage.getItem('mahjongPlayerName');
+        if (!storedRoom || !storedName) return;
+
+        roomId = storedRoom;
+        playerName = storedName;
+        document.getElementById('nameInput').value = storedName;
+        document.getElementById('roomInput').value = storedRoom;
+        socket.emit('joinRoom', { roomId: roomId, playerName: playerName });
         document.getElementById('login').style.display = 'none';
         document.getElementById('game').style.display = 'block';
     }
@@ -185,6 +201,8 @@
         document.getElementById('roundInfo').innerText = state.gameStarted ? '局势：进行中' : '局势：等待开始';
         document.getElementById('turnHint').innerText = state.gameStarted ? '提示：请注意牌河，避免点炮。' : '提示：四人入座后可开始。';
     });
+
+    window.addEventListener('load', autoJoinFromStorage);
 </script>
 
 </body>
