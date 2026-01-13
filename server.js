@@ -11,7 +11,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = {};
 
-// 创建 136 张麻将牌 + 洗牌
+// --- 1. 创建牌组 ---
 function createDeck() {
     const deck = [];
     const suits = ['万', '条', '筒'];
@@ -27,7 +27,7 @@ function createDeck() {
         for (let j = 0; j < 4; j++) deck.push(honor);
     });
 
-    // Fisher-Yates 洗牌
+    // 洗牌
     for (let i = deck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -39,10 +39,73 @@ function sortHand(hand) {
     return hand.sort();
 }
 
-io.on('connection', (socket) => {
-    console.log('连接: ' + socket.id);
+// --- 2. 胡牌算法核心 (核心逻辑) ---
+// 判断是否满足：4组(顺子/刻子) + 1对将
+function checkHu(hand) {
+    if (hand.length !== 14) return false;
 
-    // --- 修改点 1：接收对象 { roomId, playerName } ---
+    // 统计每张牌的数量
+    const map = {};
+    hand.forEach(card => map[card] = (map[card] || 0) + 1);
+
+    // 辅助函数：尝试移除顺子和刻子
+    function tryComplete(currentMap) {
+        // 获取所有的牌
+        const cards = Object.keys(currentMap).filter(k => currentMap[k] > 0).sort();
+        
+        // 如果没有牌了，说明匹配成功，胡了！
+        if (cards.length === 0) return true;
+
+        const card = cards[0]; // 拿最小的一张牌
+        const count = currentMap[card];
+
+        // 1. 尝试组成刻子 (AAA)
+        if (count >= 3) {
+            currentMap[card] -= 3;
+            if (tryComplete(currentMap)) return true;
+            currentMap[card] += 3; // 回溯
+        }
+
+        // 2. 尝试组成顺子 (ABC) - 只有万条筒能组顺子，字牌不行
+        // 解析牌型，例如 "1万" -> num=1, suit="万"
+        const num = parseInt(card); 
+        const suit = card.replace(/\d/g, ''); 
+
+        if (!isNaN(num) && num <= 7) { // 只能是 1-7 开头，8和9无法做顺子开头
+            const next1 = (num + 1) + suit;
+            const next2 = (num + 2) + suit;
+            
+            if (currentMap[next1] > 0 && currentMap[next2] > 0) {
+                currentMap[card]--;
+                currentMap[next1]--;
+                currentMap[next2]--;
+                if (tryComplete(currentMap)) return true;
+                // 回溯
+                currentMap[card]++;
+                currentMap[next1]++;
+                currentMap[next2]++;
+            }
+        }
+
+        return false;
+    }
+
+    // 遍历每一张牌，尝试把它当做“将牌”(眼)
+    for (let card of Object.keys(map)) {
+        if (map[card] >= 2) {
+            map[card] -= 2; // 移除将牌
+            if (tryComplete(map)) return true; // 看看剩下的12张能不能组成4组
+            map[card] += 2; // 放回去，试下一张
+        }
+    }
+
+    return false;
+}
+
+
+io.on('connection', (socket) => {
+    // console.log('连接: ' + socket.id);
+
     socket.on('joinRoom', ({ roomId, playerName }) => {
         socket.join(roomId);
         
@@ -56,25 +119,18 @@ io.on('connection', (socket) => {
         }
 
         const room = rooms[roomId];
-
-        // 检查是否已存在
         const existingPlayer = room.players.find(p => p.id === socket.id);
         
         if (!existingPlayer && room.players.length < 4) {
-            // --- 修改点 2：把名字存进去 ---
             room.players.push({ 
                 id: socket.id, 
-                name: playerName || `玩家${socket.id.substr(0,4)}`, // 如果没填名字，用ID代替
+                name: playerName || `玩家${socket.id.substr(0,4)}`,
                 hand: [] 
             });
         }
 
-        // 获取所有人的名字列表
         const playerNames = room.players.map(p => p.name).join(', ');
-        
-        // 通知所有人
         io.to(roomId).emit('updateInfo', `房间人数: ${room.players.length}/4 (玩家: ${playerNames})`);
-        io.to(roomId).emit('msg', `👋 【${playerName}】 加入了房间`);
 
         if (room.players.length === 4 && !room.gameStarted) {
             startGame(roomId);
@@ -88,28 +144,35 @@ io.on('connection', (socket) => {
         const player = room.players.find(p => p.id === socket.id);
         if(!player) return;
 
+        // 1. 打牌
         player.hand.splice(index, 1); 
-        
-        // --- 修改点 3：打牌消息带上名字 ---
         io.to(roomId).emit('msg', `🀄 ${player.name} 打出了 【${card}】`);
 
+        // 2. 轮转
         room.turnIndex = (room.turnIndex + 1) % 4;
-        
         const nextPlayer = room.players[room.turnIndex];
+
+        // 3. 摸牌
         if (room.deck.length > 0) {
             const newCard = room.deck.pop();
             nextPlayer.hand.push(newCard);
             sortHand(nextPlayer.hand);
+
+            // --- 新增：摸牌后立刻检测是否自摸胡牌 ---
+            if (checkHu(nextPlayer.hand)) {
+                io.to(roomId).emit('msg', `🎉🎉🎉 恭喜！【${nextPlayer.name}】 自摸胡牌了！！`);
+                io.to(roomId).emit('msg', `胡牌牌型：${nextPlayer.hand.join(' ')}`);
+                room.gameStarted = false; // 结束游戏
+            } else {
+                // 没胡，继续游戏
+            }
+
         } else {
             io.to(roomId).emit('msg', '❌ 流局！牌摸完了。');
             room.gameStarted = false;
         }
 
         syncState(roomId);
-    });
-
-    socket.on('disconnect', () => { 
-        // 暂不处理复杂逻辑 
     });
 });
 
@@ -118,6 +181,7 @@ function startGame(roomId) {
     room.gameStarted = true;
     io.to(roomId).emit('msg', '🚀 游戏开始！');
     
+    // 发牌
     room.players.forEach(p => {
         p.hand = [];
         for(let i=0; i<13; i++) {
@@ -126,9 +190,16 @@ function startGame(roomId) {
         sortHand(p.hand);
     });
 
+    // 庄家多摸一张
     if(room.deck.length > 0) {
         room.players[0].hand.push(room.deck.pop());
         sortHand(room.players[0].hand);
+        
+        // 天胡检测
+        if (checkHu(room.players[0].hand)) {
+            io.to(roomId).emit('msg', `⚡⚡⚡ 天胡！【${room.players[0].name}】 开局直接胡牌！`);
+            room.gameStarted = false;
+        }
     }
 
     syncState(roomId);
@@ -136,15 +207,14 @@ function startGame(roomId) {
 
 function syncState(roomId) {
     const room = rooms[roomId];
-    // 获取当前轮到谁的名字
     const currentPlayerName = room.players[room.turnIndex].name;
 
     room.players.forEach((p, idx) => {
         io.to(p.id).emit('gameState', {
             hand: p.hand,
-            isMyTurn: idx === room.turnIndex,
+            isMyTurn: idx === room.turnIndex && room.gameStarted, // 游戏结束就不能动了
             deckCount: room.deck.length,
-            turnName: currentPlayerName // --- 修改点 4：告诉前端现在是谁的回合 ---
+            turnName: currentPlayerName
         });
     });
 }
