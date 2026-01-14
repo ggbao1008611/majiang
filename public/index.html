@@ -5,34 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>网页联机麻将</title>
     <style>
-        body { background-color: #006400; color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
+        body {
+            background: radial-gradient(circle at top, #0c7a4b 0%, #075436 45%, #04321f 100%);
+            color: #f5f5f5;
+            font-family: 'Segoe UI', 'PingFang SC', sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 24px;
+        }
+        .container { max-width: 980px; margin: 0 auto; }
         
         /* 登录框 */
-        #login { margin-top: 80px; padding: 30px; background: rgba(0,0,0,0.6); border-radius: 10px; display: inline-block; }
-        input { padding: 12px; font-size: 16px; border-radius: 5px; border: none; margin: 5px; width: 200px; display: block; margin: 10px auto;}
-        button { padding: 10px 30px; font-size: 18px; background: #ffcc00; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 20px;}
-        button:hover { background: #ffdb4d; }
+        #login { margin-top: 80px; padding: 32px 40px; background: rgba(0,0,0,0.55); border-radius: 16px; display: inline-block; box-shadow: 0 20px 40px rgba(0,0,0,0.35); backdrop-filter: blur(4px); }
+        #login h2 { margin-top: 0; }
+        .dept-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; background: rgba(255,255,255,0.15); font-size: 14px; margin: 10px 0 6px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2); }
+        input { padding: 12px; font-size: 16px; border-radius: 8px; border: none; margin: 5px; width: 220px; display: block; margin: 12px auto; box-shadow: inset 0 1px 2px rgba(0,0,0,0.3); }
+        button { padding: 10px 30px; font-size: 18px; background: linear-gradient(135deg, #ffd84d, #ffb300); border: none; border-radius: 999px; cursor: pointer; font-weight: bold; margin-top: 20px; color: #3b2a00; box-shadow: 0 10px 20px rgba(0,0,0,0.25); }
+        button:hover { background: linear-gradient(135deg, #ffe57a, #ffc233); }
 
         /* 游戏区 */
         #game { display: none; }
-        .table-center { background: #004d00; border: 4px solid #8b4513; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-        .info-text { font-size: 16px; color: #ccc; margin-bottom: 5px;}
-        .status-bar { font-size: 22px; font-weight: bold; color: yellow; margin: 10px 0; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 5px;}
+        .table-center { background: linear-gradient(180deg, rgba(0,77,0,0.9), rgba(0,40,0,0.9)); border: 4px solid #c08a4c; padding: 18px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 16px 30px rgba(0,0,0,0.35), inset 0 0 0 2px rgba(255,255,255,0.08); }
+        .info-text { font-size: 16px; color: #d5ead5; margin-bottom: 5px;}
+        .status-bar { font-size: 22px; font-weight: bold; color: #ffe17a; margin: 10px 0; padding: 10px; background: rgba(0,0,0,0.25); border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+        .room-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 10px; }
+        .pill { background: rgba(0,0,0,0.45); border-radius: 999px; padding: 6px 14px; font-size: 14px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15); }
+        .controls { margin-top: 15px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .controls button { margin-top: 0; font-size: 16px; }
+        .controls .danger { background: linear-gradient(135deg, #ff8686, #e64a4a); color: #fff7f7; }
+        .controls .danger:hover { background: linear-gradient(135deg, #ff9c9c, #f05b5b); }
+        .turn-hint { font-size: 14px; color: #d9d9d9; }
 
         /* 麻将牌 */
-        .hand-area { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; display: inline-block; min-height: 70px;}
+        .hand-area { background: rgba(255,255,255,0.12); padding: 16px; border-radius: 12px; display: inline-block; min-height: 70px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
+        .discard-area { background: rgba(0,0,0,0.35); padding: 12px; border-radius: 12px; min-height: 70px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+        .discard-area .card { cursor: default; top: 0; }
+        .discard-area .card:hover { top: 0; }
         .card {
             display: inline-block; width: 42px; height: 60px; 
-            background: #fff; color: #cc0000; font-weight: bold; font-size: 20px;
-            border-radius: 4px; margin: 3px; line-height: 60px; cursor: pointer;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.5); border: 1px solid #ccc;
+            background: linear-gradient(180deg, #ffffff 0%, #f3f3f3 100%);
+            color: #b00000; font-weight: bold; font-size: 20px;
+            border-radius: 8px; margin: 4px; line-height: 60px; cursor: pointer;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.25); border: 1px solid #e0e0e0;
             position: relative; top: 0; transition: top 0.2s; user-select: none;
         }
-        .card:hover { top: -10px; background: #f9f9f9; }
+        .card:hover { top: -10px; background: #fdfdfd; }
 
         /* 日志 */
-        #logs { margin-top: 20px; height: 200px; overflow-y: auto; background: rgba(0,0,0,0.4); text-align: left; padding: 15px; font-size: 14px; border-radius: 5px;}
+        #logs { margin-top: 20px; height: 200px; overflow-y: auto; background: rgba(0,0,0,0.45); text-align: left; padding: 15px; font-size: 14px; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+        .rules { margin-top: 20px; background: rgba(0,0,0,0.4); padding: 16px; border-radius: 12px; text-align: left; font-size: 14px; line-height: 1.7; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+        .rules h4 { margin-top: 0; }
         p { margin: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;}
     </style>
 </head>
@@ -42,6 +64,7 @@
     <!-- 登录界面 -->
     <div id="login">
         <h2>🀄 在线麻将</h2>
+        <div class="dept-badge">🩺 肾内科专属</div>
         <!-- 新增：名字输入框 -->
         <input type="text" id="nameInput" placeholder="请输入你的昵称 (例如: 雀神)">
         <input type="text" id="roomInput" placeholder="请输入房间号 (例如: 888)">
@@ -53,6 +76,15 @@
         <div class="table-center">
             <div class="info-text" id="roomInfo">等待玩家...</div>
             <div class="status-bar" id="status">等待开始</div>
+            <div class="room-meta">
+                <span class="pill" id="deckInfo">剩余牌：--</span>
+                <span class="pill" id="roundInfo">局势：等待开始</span>
+            </div>
+            <div class="turn-hint" id="turnHint">提示：四人入座后可开始。</div>
+            <div class="controls">
+                <button onclick="requestStart()">开始新局</button>
+                <button class="danger" onclick="leaveGame()">退出房间</button>
+            </div>
         </div>
 
         <div>
@@ -60,7 +92,22 @@
             <div class="hand-area" id="myHand"></div>
         </div>
 
+        <div>
+            <h3>牌河</h3>
+            <div class="discard-area" id="discardArea"></div>
+        </div>
+
         <div id="logs"></div>
+
+        <div class="rules">
+            <h4>当前规则简述</h4>
+            <ul>
+                <li>四人满员后可开始新局，庄家先摸 14 张。</li>
+                <li>轮到你时必须打出一张手牌。</li>
+                <li>支持自摸胡与点炮胡（被打出的牌立即结算）。</li>
+                <li>暂不支持吃/碰/杠、立直、番型结算等规则。</li>
+            </ul>
+        </div>
     </div>
 </div>
 
@@ -69,6 +116,17 @@
     const socket = io();
     let roomId = "";
     let isMyTurn = false;
+    let playerName = "";
+    let clientId = "";
+
+    function getClientId() {
+        let storedId = localStorage.getItem('mahjongClientId');
+        if (!storedId) {
+            storedId = `client-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            localStorage.setItem('mahjongClientId', storedId);
+        }
+        return storedId;
+    }
 
     function join() {
         const name = document.getElementById('nameInput').value.trim();
@@ -78,10 +136,50 @@
         if(!roomId) return alert("请输入房间号");
 
         // 发送名字和房间号给服务器
-        socket.emit('joinRoom', { roomId: roomId, playerName: name });
+        clientId = getClientId();
+        socket.emit('joinRoom', { roomId: roomId, playerName: name, clientId });
+        playerName = name;
+        localStorage.setItem('mahjongRoomId', roomId);
+        localStorage.setItem('mahjongPlayerName', name);
         
         document.getElementById('login').style.display = 'none';
         document.getElementById('game').style.display = 'block';
+    }
+
+    function autoJoinFromStorage() {
+        const storedRoom = localStorage.getItem('mahjongRoomId');
+        const storedName = localStorage.getItem('mahjongPlayerName');
+        if (!storedRoom || !storedName) return;
+
+        roomId = storedRoom;
+        playerName = storedName;
+        document.getElementById('nameInput').value = storedName;
+        document.getElementById('roomInput').value = storedRoom;
+        clientId = getClientId();
+        socket.emit('joinRoom', { roomId: roomId, playerName: playerName, clientId });
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('game').style.display = 'block';
+    }
+
+    function requestStart() {
+        if (!roomId) return alert("请先加入房间！");
+        socket.emit('requestStart', { roomId });
+    }
+
+    function leaveGame() {
+        if (!roomId) return;
+        socket.emit('leaveRoom', { roomId, clientId });
+        localStorage.removeItem('mahjongRoomId');
+        localStorage.removeItem('mahjongPlayerName');
+        document.getElementById('game').style.display = 'none';
+        document.getElementById('login').style.display = 'block';
+        document.getElementById('roomInfo').innerText = '等待玩家...';
+        document.getElementById('myHand').innerHTML = '';
+        document.getElementById('discardArea').innerHTML = '';
+        document.getElementById('logs').innerHTML = '';
+        document.getElementById('deckInfo').innerText = '剩余牌：--';
+        document.getElementById('roundInfo').innerText = '局势：等待开始';
+        document.getElementById('turnHint').innerText = '提示：四人入座后可开始。';
     }
 
     socket.on('updateInfo', (msg) => {
@@ -119,7 +217,23 @@
             };
             handDiv.appendChild(c);
         });
+
+        const discardDiv = document.getElementById('discardArea');
+        discardDiv.innerHTML = '';
+        state.discards.forEach(({ name, card }) => {
+            const c = document.createElement('div');
+            c.className = 'card';
+            c.innerText = card;
+            c.title = `${name} 打出`;
+            discardDiv.appendChild(c);
+        });
+
+        document.getElementById('deckInfo').innerText = `剩余牌：${state.deckCount}`;
+        document.getElementById('roundInfo').innerText = state.gameStarted ? '局势：进行中' : '局势：等待开始';
+        document.getElementById('turnHint').innerText = state.gameStarted ? '提示：请注意牌河，避免点炮。' : '提示：四人入座后可开始。';
     });
+
+    window.addEventListener('load', autoJoinFromStorage);
 </script>
 
 </body>

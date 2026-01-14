@@ -106,13 +106,14 @@ function checkHu(hand) {
 io.on('connection', (socket) => {
     // console.log('连接: ' + socket.id);
 
-    socket.on('joinRoom', ({ roomId, playerName }) => {
+    socket.on('joinRoom', ({ roomId, playerName, clientId }) => {
         socket.join(roomId);
         
         if (!rooms[roomId]) {
             rooms[roomId] = {
                 players: [],
                 deck: createDeck(),
+                discards: [],
                 turnIndex: 0,
                 gameStarted: false
             };
@@ -120,11 +121,16 @@ io.on('connection', (socket) => {
 
         const room = rooms[roomId];
         const existingPlayer = room.players.find(p => p.id === socket.id);
-        
-        if (!existingPlayer && room.players.length < 4) {
+        const existingClient = clientId ? room.players.find(p => p.clientId === clientId) : null;
+
+        if (existingClient) {
+            existingClient.id = socket.id;
+            existingClient.name = playerName || existingClient.name;
+        } else if (!existingPlayer && room.players.length < 4) {
             room.players.push({ 
                 id: socket.id, 
                 name: playerName || `玩家${socket.id.substr(0,4)}`,
+                clientId: clientId || socket.id,
                 hand: [] 
             });
         }
@@ -143,16 +149,32 @@ io.on('connection', (socket) => {
         
         const player = room.players.find(p => p.id === socket.id);
         if(!player) return;
+        if (!room.gameStarted || room.players[room.turnIndex].id !== socket.id) return;
 
         // 1. 打牌
         player.hand.splice(index, 1); 
         io.to(roomId).emit('msg', `🀄 ${player.name} 打出了 【${card}】`);
+        room.discards.push({ name: player.name, card });
 
-        // 2. 轮转
+        // 2. 检测是否有人点炮胡牌
+        const startIndex = room.turnIndex;
+        for (let i = 1; i < room.players.length; i++) {
+            const checkIndex = (startIndex + i) % room.players.length;
+            const otherPlayer = room.players[checkIndex];
+            if (checkHu([...otherPlayer.hand, card])) {
+                io.to(roomId).emit('msg', `💥 点炮胡！【${otherPlayer.name}】 胡了 ${player.name} 打出的 【${card}】`);
+                io.to(roomId).emit('msg', `胡牌牌型：${[...otherPlayer.hand, card].sort().join(' ')}`);
+                room.gameStarted = false;
+                syncState(roomId);
+                return;
+            }
+        }
+
+        // 3. 轮转
         room.turnIndex = (room.turnIndex + 1) % 4;
         const nextPlayer = room.players[room.turnIndex];
 
-        // 3. 摸牌
+        // 4. 摸牌
         if (room.deck.length > 0) {
             const newCard = room.deck.pop();
             nextPlayer.hand.push(newCard);
@@ -174,11 +196,57 @@ io.on('connection', (socket) => {
 
         syncState(roomId);
     });
+
+    socket.on('requestStart', ({ roomId }) => {
+        const room = rooms[roomId];
+        if (!room) return;
+        if (room.gameStarted) {
+            io.to(roomId).emit('msg', '⚠️ 游戏正在进行中。');
+            return;
+        }
+        if (room.players.length < 4) {
+            io.to(roomId).emit('msg', '⚠️ 需要 4 位玩家才能开始新局。');
+            return;
+        }
+        startGame(roomId);
+    });
+
+    socket.on('leaveRoom', ({ roomId, clientId }) => {
+        const room = rooms[roomId];
+        if (!room) return;
+        socket.leave(roomId);
+        const beforeCount = room.players.length;
+        room.players = room.players.filter(player => {
+            if (clientId) {
+                return player.clientId !== clientId;
+            }
+            return player.id !== socket.id;
+        });
+        if (room.players.length !== beforeCount) {
+            const playerNames = room.players.map(p => p.name).join(', ');
+            io.to(roomId).emit('updateInfo', `房间人数: ${room.players.length}/4 (玩家: ${playerNames})`);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        Object.keys(rooms).forEach((roomId) => {
+            const room = rooms[roomId];
+            const beforeCount = room.players.length;
+            room.players = room.players.filter(player => player.id !== socket.id);
+            if (room.players.length !== beforeCount) {
+                const playerNames = room.players.map(p => p.name).join(', ');
+                io.to(roomId).emit('updateInfo', `房间人数: ${room.players.length}/4 (玩家: ${playerNames})`);
+            }
+        });
+    });
 });
 
 function startGame(roomId) {
     const room = rooms[roomId];
     room.gameStarted = true;
+    room.deck = createDeck();
+    room.discards = [];
+    room.turnIndex = 0;
     io.to(roomId).emit('msg', '🚀 游戏开始！');
     
     // 发牌
@@ -214,7 +282,9 @@ function syncState(roomId) {
             hand: p.hand,
             isMyTurn: idx === room.turnIndex && room.gameStarted, // 游戏结束就不能动了
             deckCount: room.deck.length,
-            turnName: currentPlayerName
+            turnName: currentPlayerName,
+            discards: room.discards,
+            gameStarted: room.gameStarted
         });
     });
 }
